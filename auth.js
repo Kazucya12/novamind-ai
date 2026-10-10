@@ -69,7 +69,7 @@ var GATE='<div class="kzc"><div class="kzl">✦</div><h1 id="kzh1">Masuk ke Nova
 +'<div class="kzb"><i id="kzsb"></i></div><div class="kzh" id="kzsh"></div>'
 +'<label>Ulangi kata sandi</label><div class="kzf"><input type="password" id="kzrC" placeholder="Ketik ulang" autocomplete="new-password"><button type="button" class="ey" data-t="kzrC">👁️</button></div>'
 +'<div class="kzk"><label><input type="checkbox" id="kzrA"> Saya setuju dengan syarat &amp; ketentuan</label></div><div class="kze" id="kzeR"></div><button class="kzp" id="kzbR">Buat Akun</button></form>'
-+'<div class="kzh" style="text-align:center;margin-top:14px">Data tersimpan di perangkat ini. Kata sandi di-hash SHA-256.</div></div>';
++'</div>';
 
 function $(id){return document.getElementById(id)}
 function tab(r){
