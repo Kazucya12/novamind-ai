@@ -1,29 +1,42 @@
-/* NovaMind login/register. Pasang SEBELUM script utama:  <script src="auth.js"></script> di <head> */
+/* NovaMind login/register (server). Pasang SEBELUM script utama:  <script src="auth.js"></script> di <head> */
 (function(){
 'use strict';
 var LS=null;try{LS=window.localStorage}catch(e){}
 var G=Storage.prototype.getItem,S_=Storage.prototype.setItem,R=Storage.prototype.removeItem;
-var uk=null,DATA='nm2';
+var uk=null,DATA='nm2',API='/api/account';
 function mk(st,k){return(st===LS&&k===DATA&&uk)?DATA+'_'+uk:k}
-Storage.prototype.getItem=function(k){return G.call(this,mk(this,k))};
-Storage.prototype.setItem=function(k,v){return S_.call(this,mk(this,k),v)};
-Storage.prototype.removeItem=function(k){return R.call(this,mk(this,k))};
 function st(x){try{return x?sessionStorage:localStorage}catch(e){return null}}
 function get(k,x){var s=st(x);try{return s?G.call(s,k):null}catch(e){return null}}
 function set(k,v,x){var s=st(x);try{if(s)S_.call(s,k,v)}catch(e){}}
 function del(k,x){var s=st(x);try{if(s)R.call(s,k)}catch(e){}}
-function users(){try{return JSON.parse(get('kz_users')||'{}')}catch(e){return{}}}
-function saveU(u){set('kz_users',JSON.stringify(u))}
-function hash(p,sl){
- if(window.crypto&&crypto.subtle){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(sl+p)).then(function(b){return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0')}).join('')})}
- var x=0,s=sl+p;for(var i=0;i<s.length;i++)x=(x*31+s.charCodeAt(i))|0;return Promise.resolve('f'+x)}
-function salt(){return Math.random().toString(36).slice(2)+Date.now().toString(36)}
 function emailOk(e){return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)}
+function api(body,t){
+ var h={'Content-Type':'application/json'};if(t)h.Authorization='Bearer '+t;
+ return fetch(API,{method:'POST',headers:h,body:JSON.stringify(body),keepalive:true}).then(function(r){return r.json().catch(function(){return{}}).then(function(j){return{ok:r.ok,status:r.status,j:j}})},function(){return{ok:false,status:0,j:{error:'Tidak bisa terhubung ke server. Periksa internet.'}}})}
 
-var sess=get('kz_sess',1)||get('kz_sess'),me=sess&&users()[sess]||null;
-if(me)uk=me.email;
+var tok=get('kz_tok',1)||get('kz_tok'),usr=null;
+try{usr=JSON.parse(get('kz_usr',1)||get('kz_usr')||'null')}catch(e){}
+if(tok&&usr&&usr.email)uk=usr.email;else{tok=null;usr=null}
 
-function logout(){del('kz_sess');del('kz_sess',1);location.reload()}
+/* sinkron: setiap simpan data v2 -> kirim ke server (ditunda 1.5 dtk) */
+var pend=null,tm=0,mts=0;
+function flush(){
+ if(pend===null||!tok)return;var v=pend,ts=mts;pend=null;clearTimeout(tm);
+ api({a:'save',data:v,ts:ts},tok).then(function(r){if(r.status===401)expire()})}
+function queue(v){pend=v;mts=Date.now();set('kz_ts_'+uk,String(mts));clearTimeout(tm);tm=setTimeout(flush,1500)}
+Storage.prototype.getItem=function(k){return G.call(this,mk(this,k))};
+Storage.prototype.setItem=function(k,v){var r=S_.call(this,mk(this,k),v);if(this===LS&&k===DATA&&uk)queue(v);return r};
+Storage.prototype.removeItem=function(k){return R.call(this,mk(this,k))};
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flush()});
+window.addEventListener('pagehide',flush);
+
+function clearSess(){del('kz_tok');del('kz_tok',1);del('kz_usr');del('kz_usr',1)}
+function expire(){clearSess();location.reload()}
+function logout(){flush();try{if(uk)R.call(LS,DATA+'_'+uk)}catch(e){}clearSess();location.reload()}
+function startSession(j,remember){
+ clearSess();var x=!remember;set('kz_tok',j.token,x);set('kz_usr',JSON.stringify(j.user),x);
+ try{if(j.data!=null){S_.call(LS,DATA+'_'+j.user.email,j.data);S_.call(LS,'kz_ts_'+j.user.email,String(j.ts||0))}else{R.call(LS,DATA+'_'+j.user.email)}}catch(e){}
+ location.reload()}
 
 var CSS='#kzg{position:fixed;inset:0;z-index:99999;background:var(--bg,#0d0f1f);color:var(--tx,#eceefb);overflow-y:auto;display:grid;place-items:center;padding:20px;font:15px/1.6 Sora,system-ui,sans-serif}'
 +'#kzg *{box-sizing:border-box}'
@@ -81,22 +94,19 @@ function buildGate(){
   if(p.length<8)return er.textContent='Kata sandi minimal 8 karakter';
   if(p!==$('kzrC').value)return er.textContent='Konfirmasi kata sandi tidak cocok';
   if(!$('kzrA').checked)return er.textContent='Centang persetujuan terlebih dahulu';
-  var u=users();if(u[e])return er.textContent='Email sudah terdaftar, silakan masuk';
-  $('kzbR').disabled=true;var sl=salt();
-  hash(p,sl).then(function(h){
-   u[e]={name:n,email:e,salt:sl,hash:h,created:Date.now()};saveU(u);
-   if(!get('kz_legacy')){var old=LS&&G.call(LS,DATA);if(old)S_.call(LS,DATA+'_'+e,old);set('kz_legacy','1')}
-   del('kz_sess');set('kz_sess',e,1);location.reload()})};
- var fails=0,lock=0;
+  var body={a:'register',name:n,email:e,pass:p},old=null;
+  if(!get('kz_legacy')){try{old=LS&&G.call(LS,DATA)}catch(x){}if(old){body.data=old;body.ts=Date.now()}}
+  $('kzbR').disabled=true;er.textContent='';
+  api(body).then(function(r){$('kzbR').disabled=false;
+   if(!r.ok)return er.textContent=r.j.error||'Gagal mendaftar';
+   set('kz_legacy','1');startSession(r.j,true)})};
  $('kzbL').onclick=function(){
   var e=$('kzlE').value.trim().toLowerCase(),p=$('kzlP').value,er=$('kzeL');
-  if(Date.now()<lock)return er.textContent='Terlalu banyak percobaan. Tunggu '+Math.ceil((lock-Date.now())/1000)+' detik';
   if(!emailOk(e)||!p)return er.textContent='Isi email dan kata sandi dengan benar';
-  var a=users()[e];$('kzbL').disabled=true;
-  (a?hash(p,a.salt):Promise.resolve('')).then(function(h){
-   $('kzbL').disabled=false;
-   if(!a||h!==a.hash){if(++fails>=5){lock=Date.now()+30000;fails=0}return er.textContent='Email atau kata sandi salah'}
-   del('kz_sess');del('kz_sess',1);set('kz_sess',e,!$('kzlR').checked);location.reload()})};
+  $('kzbL').disabled=true;er.textContent='';
+  api({a:'login',email:e,pass:p}).then(function(r){$('kzbL').disabled=false;
+   if(!r.ok)return er.textContent=r.j.error||'Gagal masuk';
+   startSession(r.j,$('kzlR').checked)})};
  [['kzlE','kzbL'],['kzlP','kzbL'],['kzrC','kzbR']].forEach(function(x){$(x[0]).addEventListener('keydown',function(ev){if(ev.key==='Enter')$(x[1]).click()})});
 }
 
@@ -104,18 +114,25 @@ function buildBar(){
  var side=document.getElementById('side');if(!side)return;
  var d=document.createElement('div');d.className='kzu';
  d.innerHTML='<div class="kza"></div><div class="kzn"><b></b><small></small></div><button id="kzLo">Keluar</button><button id="kzDel" title="Hapus akun" aria-label="Hapus akun">🗑</button>';
- d.querySelector('.kza').textContent=me.name.charAt(0).toUpperCase();
- d.querySelector('b').textContent=me.name;d.querySelector('small').textContent=me.email;
+ d.querySelector('.kza').textContent=usr.name.charAt(0).toUpperCase();
+ d.querySelector('b').textContent=usr.name;d.querySelector('small').textContent=usr.email;
  side.appendChild(d);
  $('kzLo').onclick=logout;
  $('kzDel').onclick=function(){
-  if(!confirm('Hapus akun beserta semua chat secara permanen?'))return;
-  var u=users();delete u[me.email];saveU(u);try{R.call(LS,DATA+'_'+me.email)}catch(e){}logout()};
+  if(!confirm('Hapus akun beserta semua chat secara permanen? Ini juga menghapus data di server.'))return;
+  api({a:'delete'},tok).then(function(r){if(!r.ok&&r.status!==401)return alert(r.j.error||'Gagal menghapus akun');pend=null;logout()})};
 }
+
+function pull(){
+ api({a:'load'},tok).then(function(r){
+  if(r.status===401)return expire();
+  if(!r.ok||r.j.data==null)return;
+  var lts=+get('kz_ts_'+uk)||0;
+  if((r.j.ts||0)>lts&&pend===null){try{S_.call(LS,DATA+'_'+uk,r.j.data);S_.call(LS,'kz_ts_'+uk,String(r.j.ts))}catch(e){}location.reload()}})}
 
 function init(){
  var s=document.createElement('style');s.textContent=CSS;document.head.appendChild(s);
- if(me)buildBar();else buildGate();
+ if(usr){buildBar();pull()}else buildGate();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
