@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Masuk / Daftar</title>
+<style>
+:root{--bg:#f3f1ff;--card:#fff;--tx:#1d1b2e;--mu:#6b6885;--bd:#e3e0f5;--pr:#6c4cf5;--pr2:#a24cf5;--ok:#16a34a;--er:#dc2626;--in:#f7f6ff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f0d1c;--card:#191631;--tx:#efedff;--mu:#9a96bd;--bd:#2c2850;--in:#120f26}}
+:root[data-theme="dark"]{--bg:#0f0d1c;--card:#191631;--tx:#efedff;--mu:#9a96bd;--bd:#2c2850;--in:#120f26}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:grid;place-items:center;padding:20px;position:relative;overflow-x:hidden}
+.blob{position:fixed;border-radius:50%;filter:blur(70px);opacity:.45;z-index:0;pointer-events:none}
+.b1{width:300px;height:300px;background:var(--pr);top:-80px;left:-80px}.b2{width:260px;height:260px;background:var(--pr2);bottom:-70px;right:-60px}
+.card{position:relative;z-index:1;width:100%;max-width:400px;background:var(--card);border:1px solid var(--bd);border-radius:24px;padding:28px 24px;box-shadow:0 20px 60px rgba(108,76,245,.18);animation:up .5s ease}
+@keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.logo{width:56px;height:56px;border-radius:18px;background:linear-gradient(135deg,var(--pr),var(--pr2));display:grid;place-items:center;font-size:28px;margin:0 auto 12px;box-shadow:0 8px 24px rgba(108,76,245,.4)}
+h1{font-size:22px;margin:0;text-align:center}.sub{color:var(--mu);font-size:14px;text-align:center;margin:4px 0 20px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--in);border-radius:14px;padding:4px;margin-bottom:18px;position:relative}
+.tabs button{border:0;background:none;color:var(--mu);font:600 14px inherit;padding:10px;border-radius:11px;cursor:pointer;position:relative;z-index:1;transition:.2s}
+.tabs button.on{background:var(--card);color:var(--pr);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 6px}
+.f{position:relative}.f input[type=text],.f input[type=email],.f input[type=password]{width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--bd);background:var(--in);color:var(--tx);font-size:15px;outline:none;transition:.2s}
+.f input:focus{border-color:var(--pr);box-shadow:0 0 0 4px rgba(108,76,245,.15)}
+.eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:none;cursor:pointer;font-size:18px;padding:6px}
+.bar{height:5px;border-radius:5px;background:var(--bd);margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;width:0;transition:.3s}
+.hint{font-size:12px;color:var(--mu);margin-top:4px;min-height:16px}
+.row{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:13px;color:var(--mu)}
+.row label{display:flex;gap:8px;align-items:center;margin:0;font-weight:500;cursor:pointer}
+.btn{width:100%;margin-top:18px;border:0;border-radius:14px;padding:14px;font:700 15px inherit;color:#fff;background:linear-gradient(135deg,var(--pr),var(--pr2));cursor:pointer;box-shadow:0 8px 20px rgba(108,76,245,.35);transition:.2s}
+.btn:hover{transform:translateY(-1px)}.btn:disabled{opacity:.6;cursor:wait}
+.btn.ghost{background:var(--in);color:var(--tx);box-shadow:none;border:1px solid var(--bd);margin-top:10px}.btn.danger{background:none;color:var(--er);box-shadow:none;border:1px solid var(--er)}
+.err{color:var(--er);font-size:13px;margin-top:12px;min-height:18px;text-align:center}
+.hide{display:none!important}
+.av{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--pr),var(--pr2));display:grid;place-items:center;font-size:30px;font-weight:700;color:#fff;margin:0 auto 12px}
+.info{background:var(--in);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;margin:16px 0 4px;font-size:13px}
+.info div{display:flex;justify-content:space-between;gap:10px;padding:5px 0}.info span{color:var(--mu)}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);background:var(--tx);color:var(--bg);padding:12px 18px;border-radius:12px;font-size:14px;opacity:0;transition:.3s;z-index:9;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.tg{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:12px;z-index:2;border:1px solid var(--bd);background:var(--card);border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:18px}
+.note{font-size:11px;color:var(--mu);text-align:center;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div>
+<button class="tg" id="tg" title="Ganti tema">🌓</button>
+
+<div class="card" id="auth">
+  <div class="logo">🔐</div>
+  <h1 id="ttl">Selamat Datang</h1>
+  <p class="sub" id="sub">Masuk untuk melanjutkan</p>
+  <div class="tabs"><button id="tL" class="on">Masuk</button><button id="tR">Daftar</button></div>
+
+  <form id="fL" onsubmit="return false" novalidate>
+    <label>Email</label><div class="f"><input type="email" id="lE" placeholder="nama@email.com" autocomplete="username"></div>
+    <label>Kata sandi</label><div class="f"><input type="password" id="lP" placeholder="••••••••" autocomplete="current-password"><button type="button" class="eye" data-t="lP">👁️</button></div>
+    <div class="row"><label><input type="checkbox" id="lR" checked> Ingat saya</label></div>
+    <div class="err" id="eL"></div>
+    <button class="btn" id="bL">Masuk</button>
+  </form>
+
+  <form id="fR" class="hide" onsubmit="return false" novalidate>
+    <label>Nama lengkap</label><div class="f"><input type="text" id="rN" placeholder="Nama kamu" autocomplete="name"></div>
+    <label>Email</label><div class="f"><input type="email" id="rE" placeholder="nama@email.com" autocomplete="email"></div>
+    <label>Kata sandi</label><div class="f"><input type="password" id="rP" placeholder="Minimal 8 karakter" autocomplete="new-password"><button type="button" class="eye" data-t="rP">👁️</button></div>
+    <div class="bar"><i id="sb"></i></div><div class="hint" id="sh"></div>
+    <label>Ulangi kata sandi</label><div class="f"><input type="password" id="rC" placeholder="Ketik ulang" autocomplete="new-password"><button type="button" class="eye" data-t="rC">👁️</button></div>
+    <div class="row"><label><input type="checkbox" id="rA"> Saya setuju dengan syarat &amp; ketentuan</label></div>
+    <div class="err" id="eR"></div>
+    <button class="btn" id="bR">Buat Akun</button>
+  </form>
+  <p class="note">Data tersimpan di perangkat ini (localStorage). Kata sandi di-hash SHA-256.</p>
+</div>
+
+<div class="card hide" id="dash">
+  <div class="av" id="dA">K</div>
+  <h1 id="dN">Halo!</h1><p class="sub" id="dS">Kamu berhasil masuk</p>
+  <div class="info"><div><span>Email</span><b id="dE"></b></div><div><span>Terdaftar</span><b id="dD"></b></div><div><span>Login terakhir</span><b id="dL"></b></div></div>
+  <button class="btn" id="out">Keluar</button>
+  <button class="btn danger ghost" id="del">Hapus Akun</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id),mem={};
+const S={
+ get(k,s){try{return(s?sessionStorage:localStorage).getItem(k)}catch(e){return mem[k]??null}},
+ set(k,v,s){try{(s?sessionStorage:localStorage).setItem(k,v)}catch(e){mem[k]=v}},
+ del(k,s){try{(s?sessionStorage:localStorage).removeItem(k)}catch(e){delete mem[k]}}
+};
+const users=()=>{try{return JSON.parse(S.get('kz_users')||'{}')}catch(e){return{}}};
+const save=u=>S.set('kz_users',JSON.stringify(u));
+async function hash(p,salt){
+ if(window.crypto&&crypto.subtle){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+p));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+ let x=0;for(const c of salt+p)x=(x*31+c.charCodeAt(0))|0;return'f'+x;
+}
+const salt=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
+const fmt=t=>new Date(t).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+const emailOk=e=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+let tt;function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400)}
+
+// tema
+$('tg').onclick=()=>{const d=document.documentElement,dark=d.dataset.theme==='dark'||(!d.dataset.theme&&matchMedia('(prefers-color-scheme:dark)').matches);d.dataset.theme=dark?'light':'dark';S.set('kz_theme',d.dataset.theme)};
+{const t=S.get('kz_theme');if(t)document.documentElement.dataset.theme=t}
+
+// tab
+function tab(r){
+ $('tL').classList.toggle('on',!r);$('tR').classList.toggle('on',r);
+ $('fL').classList.toggle('hide',r);$('fR').classList.toggle('hide',!r);
+ $('ttl').textContent=r?'Buat Akun Baru':'Selamat Datang';$('sub').textContent=r?'Daftar gratis dalam hitungan detik':'Masuk untuk melanjutkan';
+ $('eL').textContent=$('eR').textContent='';
+}
+$('tL').onclick=()=>tab(false);$('tR').onclick=()=>tab(true);
+document.querySelectorAll('.eye').forEach(b=>b.onclick=()=>{const i=$(b.dataset.t);i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'👁️':'🙈'});
+
+// kekuatan sandi
+$('rP').oninput=e=>{
+ const p=e.target.value;let s=0;
+ if(p.length>=8)s++;if(p.length>=12)s++;if(/[a-z]/.test(p)&&/[A-Z]/.test(p))s++;if(/\d/.test(p))s++;if(/[^\w\s]/.test(p))s++;
+ const L=[['Terlalu lemah','#dc2626'],['Lemah','#ea580c'],['Cukup','#ca8a04'],['Bagus','#65a30d'],['Kuat','#16a34a'],['Sangat kuat','#16a34a']][p?s:0];
+ $('sb').style.width=p?(s/5*100)+'%':'0';$('sb').style.background=L[1];$('sh').textContent=p?L[0]:'';
+};
+
+// daftar
+$('bR').onclick=async()=>{
+ const n=$('rN').value.trim(),e=$('rE').value.trim().toLowerCase(),p=$('rP').value,c=$('rC').value,er=$('eR');
+ if(n.length<2)return er.textContent='Nama minimal 2 karakter';
+ if(!emailOk(e))return er.textContent='Format email tidak valid';
+ if(p.length<8)return er.textContent='Kata sandi minimal 8 karakter';
+ if(p!==c)return er.textContent='Konfirmasi kata sandi tidak cocok';
+ if(!$('rA').checked)return er.textContent='Centang persetujuan terlebih dahulu';
+ const u=users();if(u[e])return er.textContent='Email sudah terdaftar, silakan masuk';
+ $('bR').disabled=true;const s=salt();
+ u[e]={name:n,email:e,salt:s,hash:await hash(p,s),created:Date.now(),last:null};
+ save(u);$('bR').disabled=false;er.textContent='';
+ $('fR').reset();$('sb').style.width='0';$('sh').textContent='';
+ tab(false);$('lE').value=e;toast('Akun berhasil dibuat! Silakan masuk 🎉');$('lP').focus();
+};
+
+// masuk
+let fails=0,lock=0;
+$('bL').onclick=async()=>{
+ const e=$('lE').value.trim().toLowerCase(),p=$('lP').value,er=$('eL');
+ if(Date.now()<lock)return er.textContent='Terlalu banyak percobaan. Tunggu '+Math.ceil((lock-Date.now())/1000)+' detik';
+ if(!emailOk(e)||!p)return er.textContent='Isi email dan kata sandi dengan benar';
+ $('bL').disabled=true;const u=users(),a=u[e];
+ const ok=a&&(await hash(p,a.salt))===a.hash;$('bL').disabled=false;
+ if(!ok){if(++fails>=5){lock=Date.now()+30000;fails=0}return er.textContent='Email atau kata sandi salah'}
+ fails=0;er.textContent='';a.prev=a.last;a.last=Date.now();save(u);
+ const rem=$('lR').checked;S.del('kz_sess');S.del('kz_sess',true);S.set('kz_sess',e,!rem);
+ $('fL').reset();show(a);toast('Selamat datang, '+a.name.split(' ')[0]+'!');
+};
+[['lE','bL'],['lP','bL'],['rC','bR']].forEach(([i,b])=>$(i).addEventListener('keydown',ev=>{if(ev.key==='Enter')$(b).click()}));
+
+// dashboard
+function show(a){
+ $('auth').classList.add('hide');$('dash').classList.remove('hide');
+ $('dA').textContent=a.name[0].toUpperCase();$('dN').textContent='Halo, '+a.name.split(' ')[0]+'!';
+ $('dE').textContent=a.email;$('dD').textContent=fmt(a.created);$('dL').textContent=a.prev?fmt(a.prev):'Pertama kali';
+}
+function logout(){S.del('kz_sess');S.del('kz_sess',true);$('dash').classList.add('hide');$('auth').classList.remove('hide');tab(false)}
+$('out').onclick=()=>{logout();toast('Kamu sudah keluar')};
+$('del').onclick=()=>{
+ const e=S.get('kz_sess',true)||S.get('kz_sess');
+ if(!confirm('Hapus akun ini secara permanen?'))return;
+ const u=users();delete u[e];save(u);logout();toast('Akun dihapus');
+};
+
+// sesi
+{const e=S.get('kz_sess',true)||S.get('kz_sess'),a=e&&users()[e];if(a)show(a)}
+</script>
+</body>
+</html>
