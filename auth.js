@@ -153,9 +153,12 @@ function pull(){
   var lts=+get('kz_ts_'+uk)||0;
   if((r.j.ts||0)>lts&&pend===null){try{S_.call(LS,DATA+'_'+uk,r.j.data);S_.call(LS,'kz_ts_'+uk,String(r.j.ts))}catch(e){}location.reload()}})}
 
+/* muat UI kuota & Pro setelah script utama siap */
+function loadPro(){var s=document.createElement('script');s.src='pro.js?v=1';s.async=false;document.body.appendChild(s)}
+
 function init(){
  var s=document.createElement('style');s.textContent=CSS;document.head.appendChild(s);
- if(usr){buildBar();pull()}else buildGate();
+ if(usr){buildBar();pull();loadPro()}else buildGate();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
