@@ -2,7 +2,8 @@
 (function(){
 'use strict';
 function tk(){try{return sessionStorage.getItem('kz_tok')||localStorage.getItem('kz_tok')}catch(e){return null}}
-if(!tk()||!document.getElementById('side'))return;
+if(window.__novaPro||!tk()||!document.getElementById('side'))return;
+window.__novaPro=1;
 
 var PRO_MODELS={'deepseek-v4-pro-0813':1,'gpt-5.6-luna':1}; /* model khusus Pro */
 var Q=null;
