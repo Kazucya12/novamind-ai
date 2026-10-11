@@ -18,6 +18,14 @@ const MAIL_OK = !!((GUSER && GPASS) || (BREVO && FROM));
 const MAIL_ERR = 'Layanan email belum dikonfigurasi (isi GMAIL_USER dan GMAIL_APP_PASSWORD di Vercel).';
 const DAYS = 30, MAX = 900000;
 const CODE_TTL = 600, RESEND_WAIT = 60, MAX_TRIES = 5;
+// Kuota AI + paket Pro (semua bisa diubah lewat variabel Vercel tanpa edit kode)
+const DAILY_FREE = Math.max(1, Number(process.env.DAILY_FREE) || 30);   // pesan/hari akun gratis
+const DAILY_PRO = Math.max(1, Number(process.env.DAILY_PRO) || 300);    // pesan/hari akun Pro
+const PRO_DAYS = Math.max(1, Number(process.env.PRO_DAYS) || 30);       // lama Pro per pembelian
+const ADMIN_KEY = process.env.ADMIN_KEY || '';                          // kunci panel admin.html
+const PRO_PRICE = process.env.PRO_PRICE || 'Rp 25.000';                 // teks harga
+const PRO_LINK = process.env.PRO_LINK || '';                            // link bayar (Trakteer/Saweria/WhatsApp)
+const WIB = 7 * 3600e3;
 
 async function rd(...cmd) {
   const r = await fetch(URL_, { method: 'POST', headers: { Authorization: 'Bearer ' + TOK, 'Content-Type': 'application/json' }, body: JSON.stringify(cmd) });
@@ -108,7 +116,7 @@ async function issue(email, pv) {
 
 // batas pengiriman: cooldown per email, per jam per email, per jam per IP
 async function sendGuard(req, email) {
-  const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'x';
+  const ip = getIp(req);
   const ni = await rd('INCR', 'ri:' + ip);
   if (ni === 1) await rd('EXPIRE', 'ri:' + ip, 3600);
   if (ni > 10) return { error: 'Terlalu banyak permintaan dari jaringanmu. Coba lagi nanti.' };
@@ -118,6 +126,30 @@ async function sendGuard(req, email) {
   if (ne === 1) await rd('EXPIRE', 'ps:' + email, 3600);
   if (ne > 5) return { error: 'Batas kirim kode per jam tercapai. Coba lagi nanti.' };
   return null;
+}
+
+const getIp = (req) => (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'x';
+const dayKey = () => new Date(Date.now() + WIB).toISOString().slice(0, 10);
+const nextReset = () => Math.floor((Date.now() + WIB) / 864e5 + 1) * 864e5 - WIB; // 00.00 WIB berikutnya
+function mkQuota(proUntil, used) {
+  const isPro = proUntil > Date.now(), limit = isPro ? DAILY_PRO : DAILY_FREE, u = Math.min(used, limit);
+  return {
+    plan: isPro ? 'pro' : 'free', limit, used: u, remaining: Math.max(limit - used, 0), proUntil: isPro ? proUntil : 0, resetAt: nextReset(),
+    plans: { free: DAILY_FREE, pro: DAILY_PRO, days: PRO_DAYS, price: PRO_PRICE, link: PRO_LINK },
+  };
+}
+async function quotaOf(email) {
+  const [pro, used] = await Promise.all([rd('GET', 'pro:' + email), rd('GET', 'q:' + email + ':' + dayKey())]);
+  return mkQuota(Number(pro) || 0, Number(used) || 0);
+}
+const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newVoucher() { let c = ''; for (let i = 0; i < 8; i++) c += CODE_ABC[crypto.randomInt(CODE_ABC.length)]; return 'NM' + c; }
+const fmtVoucher = (c) => c.slice(0, 2) + '-' + c.slice(2, 6) + '-' + c.slice(6);
+async function grantPro(email, days) {
+  const cur = Number(await rd('GET', 'pro:' + email)) || 0;
+  const until = Math.max(cur, Date.now()) + days * 864e5;
+  await rd('SET', 'pro:' + email, String(until));
+  return until;
 }
 
 export const OPTIONS = () => new Response(null, { status: 204 });
@@ -194,6 +226,25 @@ export const POST = async (req) => {
       const o = d ? JSON.parse(d) : { data: null, ts: 0 };
       return out(200, { token: mint(email), user: pub(u), data: o.data, ts: o.ts });
     }
+    // panel admin: buat kode Pro / beri Pro manual (butuh ADMIN_KEY)
+    if (a === 'admin_codes' || a === 'admin_grant') {
+      if (!ADMIN_KEY) return out(500, { error: 'ADMIN_KEY belum diisi di Vercel.' });
+      const ip = getIp(req), n = await rd('INCR', 'ra:' + ip);
+      if (n === 1) await rd('EXPIRE', 'ra:' + ip, 900);
+      if (n > 20) return out(429, { error: 'Terlalu banyak percobaan. Coba lagi nanti.' });
+      const x = Buffer.from(String(b.key || '')), y = Buffer.from(ADMIN_KEY);
+      if (x.length !== y.length || !crypto.timingSafeEqual(x, y)) return out(401, { error: 'Kunci admin salah' });
+      const days = Math.min(Math.max(Math.floor(Number(b.days)) || PRO_DAYS, 1), 365);
+      if (a === 'admin_codes') {
+        const cnt = Math.min(Math.max(Math.floor(Number(b.count)) || 1, 1), 50), list = [];
+        for (let i = 0; i < cnt; i++) { const c = newVoucher(); await rd('SET', 'v:' + c, String(days)); list.push(fmtVoucher(c)); }
+        return out(200, { codes: list, days });
+      }
+      const em = String(b.email || '').trim().toLowerCase();
+      if (!emailOk(em)) return out(400, { error: 'Format email tidak valid' });
+      if (!(await rd('EXISTS', 'u:' + em))) return out(404, { error: 'Akun dengan email itu belum terdaftar' });
+      return out(200, { email: em, proUntil: await grantPro(em, days) });
+    }
     const tk = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '') || b.token;
     const email = verify(tk);
     if (!email) return out(401, { error: 'Sesi berakhir, silakan masuk lagi' });
@@ -208,6 +259,32 @@ export const POST = async (req) => {
       if (typeof b.data !== 'string' || b.data.length >= MAX) return out(413, { error: 'Data terlalu besar' });
       await rd('SET', 'd:' + email, JSON.stringify({ data: b.data, ts: Number(b.ts) || Date.now() }));
       return out(200, { ok: true });
+    }
+    if (a === 'quota') return out(200, { quota: await quotaOf(email) });
+    if (a === 'use') {
+      if (!(await rd('EXISTS', 'u:' + email))) return out(401, { error: 'Akun tidak ditemukan' });
+      const proUntil = Number(await rd('GET', 'pro:' + email)) || 0;
+      const limit = proUntil > Date.now() ? DAILY_PRO : DAILY_FREE, k = 'q:' + email + ':' + dayKey();
+      const n = await rd('INCR', k);
+      if (n === 1) await rd('EXPIRE', k, 172800);
+      if (n > limit) {
+        await rd('DECR', k);
+        const isPro = proUntil > Date.now();
+        return out(429, { error: 'Kuota harian ' + (isPro ? 'Pro ' : '') + 'habis (' + limit + '/' + limit + '). Reset otomatis jam 00.00 WIB.' + (isPro ? '' : ' Upgrade ke Pro untuk batas lebih besar.'), quota: mkQuota(proUntil, limit) });
+      }
+      return out(200, { quota: mkQuota(proUntil, n) });
+    }
+    if (a === 'redeem') {
+      const code = String(b.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (code.length < 8) return out(400, { error: 'Kode tidak valid' });
+      const rk = 'rv:' + email, n = await rd('INCR', rk);
+      if (n === 1) await rd('EXPIRE', rk, 900);
+      if (n > 10) return out(429, { error: 'Terlalu banyak percobaan. Coba lagi dalam 15 menit.' });
+      const raw = await rd('GET', 'v:' + code);
+      if (!raw || (await rd('DEL', 'v:' + code)) !== 1) return out(400, { error: 'Kode tidak valid atau sudah dipakai' });
+      const days = Number(raw) || PRO_DAYS;
+      await grantPro(email, days);
+      return out(200, { ok: true, days, quota: await quotaOf(email) });
     }
     if (a === 'delete') { await rd('DEL', 'u:' + email, 'd:' + email); return out(200, { ok: true }); }
     return out(400, { error: 'Aksi tidak dikenal' });
