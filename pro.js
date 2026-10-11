@@ -7,6 +7,9 @@ window.__novaPro=1;
 
 var PRO_MODELS={'deepseek-v4-pro-0813':1,'gpt-5.6-luna':1}; /* model khusus Pro */
 var Q=null;
+/* batas per paket: mem = jumlah pesan terakhir yang diingat AI, max = batas token jawaban */
+var LIM={free:{mem:8,max:2500,words:500},pro:{mem:30,max:5000}};
+function lim(){return LIM[Q&&Q.plan==='pro'?'pro':'free']}
 function $(id){return document.getElementById(id)}
 function api(body){
  return fetch('/api/account',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tk()},body:JSON.stringify(body)})
@@ -54,8 +57,8 @@ if(note)note.parentNode.insertBefore(qn,note);
 
 var ov=document.createElement('div');ov.id='pro';
 ov.innerHTML='<div class="pm"><div class="pmh"><button class="pbtn" id="pbk" aria-label="Kembali">← Kembali</button><h3>NovaMind Pro</h3></div>'
-+'<div class="pmg"><div class="pc"><h4>Gratis</h4><div class="pp" id="pfp"></div><ul><li>Chat dengan AI</li><li>Model standar</li><li>Chat tersimpan di akun</li></ul></div>'
-+'<div class="pc pr"><h4>⭐ Pro</h4><div class="pp" id="ppp"></div><ul><li>Batas pesan jauh lebih besar</li><li>Model Pro: DeepSeek V4 Pro, GPT 5.6 Luna</li><li>Semua fitur gratis</li></ul></div></div>'
++'<div class="pmg"><div class="pc"><h4>Gratis</h4><div class="pp" id="pfp"></div><ul><li>Jawaban ringkas (±500 kata)</li><li>Ingat 8 pesan terakhir</li><li>Model standar</li><li>Chat tersimpan di akun</li></ul></div>'
++'<div class="pc pr"><h4>⭐ Pro</h4><div class="pp" id="ppp"></div><ul><li>Jawaban panjang (±2.000 kata)</li><li>Ingat 30 pesan terakhir</li><li>Model Pro: DeepSeek V4 Pro, GPT 5.6 Luna</li><li>Semua fitur gratis</li></ul></div></div>'
 +'<div class="pst" id="pst"></div>'
 +'<button class="pbtn go" id="pbuy">Beli Pro</button>'
 +'<label>Sudah punya kode aktivasi?</label><div class="pr2"><input type="text" id="pcode" placeholder="NM-XXXX-XXXX" maxlength="14" autocomplete="off"><button class="pbtn" id="pact">Aktifkan</button></div>'
@@ -84,7 +87,15 @@ card.onclick=qn.onclick=function(e){if(e.target.dataset&&e.target.dataset.up)ope
 $('pbk').onclick=closePro;
 ov.onclick=function(e){if(e.target===ov)closePro()};
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&ov.classList.contains('on'))closePro()});
-$('pbuy').onclick=function(){var l=Q&&Q.plans&&Q.plans.link;if(l&&/^https?:\/\//i.test(l))window.open(l,'_blank','noopener');else msg('Pembelian belum dibuka. Hubungi admin untuk membeli Pro.','er')};
+function me(){try{return JSON.parse(sessionStorage.getItem('kz_usr')||localStorage.getItem('kz_usr')||'null')||{}}catch(e){return{}}}
+/* link WhatsApp otomatis diisi pesan + email akun, supaya admin tahu siapa yang membeli */
+function buyUrl(l){
+ try{var u=new URL(l),h=u.hostname.replace(/^www\./,'');
+  if(h==='wa.me'||h==='api.whatsapp.com'){
+   var p=(Q&&Q.plans)||{},m=me(),t='Halo, saya mau beli NovaMind Pro ('+p.days+' hari, '+p.price+').\nEmail akun: '+(m.email||'-');
+   u.searchParams.delete('text');var b=u.toString();return b+(b.indexOf('?')<0?'?':'&')+'text='+encodeURIComponent(t)}
+  return u.toString()}catch(e){return l}}
+$('pbuy').onclick=function(){var l=Q&&Q.plans&&Q.plans.link;if(l&&/^https?:\/\//i.test(l))window.open(buyUrl(l),'_blank','noopener');else msg('Pembelian belum dibuka. Hubungi admin untuk membeli Pro.','er')};
 $('pact').onclick=function(){
  var c=$('pcode').value.trim();if(!c)return msg('Masukkan kode aktivasi','er');
  $('pact').disabled=true;msg('Memeriksa…');
@@ -107,9 +118,26 @@ if(typeof _call==='function'){
    if(r.status===429){setTimeout(openPro,250);throw new Error(r.j.error||'Kuota harian habis.')}
    if(r.status===401)throw new Error('Sesi berakhir. Muat ulang halaman lalu masuk lagi.');
   }
-  return _call.apply(this,arguments);
+  return _call.call(this,test?msgs:shape(msgs),test?sys:sysFor(sys),on,signal);
  };
 }
+/* ingatan percakapan: potong riwayat sesuai paket (selalu mulai dari pesan pengguna) */
+function shape(msgs){
+ var a=(msgs||[]).slice(-lim().mem);
+ while(a.length>1&&a[0].role!=='user')a.shift();
+ return a}
+/* paket gratis diminta menjawab ringkas supaya tidak terpotong */
+function sysFor(sys){
+ if(Q&&Q.plan==='pro')return sys;
+ return sys+' Jawab ringkas dan padat, maksimal sekitar '+LIM.free.words+' kata, agar jawaban tidak terpotong.'}
+/* batas token jawaban dikirim ke proxy (kalau proxy mendukung max_tokens) */
+var _fetch=window.fetch;
+window.fetch=function(u,o){
+ try{
+  if(Q&&o&&typeof o.body==='string'&&String(u).indexOf('/chat/completions')>-1){
+   var b=JSON.parse(o.body);b.max_tokens=lim().max;o=Object.assign({},o,{body:JSON.stringify(b)})}
+ }catch(e){}
+ return _fetch.call(this,u,o)};
 
 /* tandai model Pro di daftar model */
 try{if(typeof DM!=='undefined'){DM.forEach(function(x){if(PRO_MODELS[x[0]]&&x[1].indexOf('⭐')<0)x[1]+=' ⭐'});if(typeof applySet==='function')applySet()}}catch(e){}
