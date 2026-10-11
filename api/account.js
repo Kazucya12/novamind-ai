@@ -1,6 +1,9 @@
 // Vercel serverless: akun + sinkron chat + verifikasi email saat daftar. Database: Upstash Redis. Email: Brevo.
-// Variabel Vercel yang dibutuhkan: AUTH_SECRET, KV_REST_API_URL/TOKEN (Upstash), BREVO_API_KEY, MAIL_FROM
+// Variabel Vercel: AUTH_SECRET, KV_REST_API_URL/TOKEN (Upstash), dan salah satu pengirim email:
+//   Gmail : GMAIL_USER + GMAIL_APP_PASSWORD   (paling mudah)
+//   Brevo : BREVO_API_KEY + MAIL_FROM
 import crypto from 'node:crypto';
+import tls from 'node:tls';
 import { promisify } from 'node:util';
 const scrypt = promisify(crypto.scrypt);
 
@@ -9,6 +12,10 @@ const TOK = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKE
 const SECRET = process.env.AUTH_SECRET;
 const BREVO = process.env.BREVO_API_KEY;
 const FROM = process.env.MAIL_FROM;
+const GUSER = process.env.GMAIL_USER;
+const GPASS = String(process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
+const MAIL_OK = !!((GUSER && GPASS) || (BREVO && FROM));
+const MAIL_ERR = 'Layanan email belum dikonfigurasi (isi GMAIL_USER dan GMAIL_APP_PASSWORD di Vercel).';
 const DAYS = 30, MAX = 900000;
 const CODE_TTL = 600, RESEND_WAIT = 60, MAX_TRIES = 5;
 
@@ -38,16 +45,54 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 const json = (c, o) => new Response(JSON.stringify(o), { status: c, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
+// kirim email lewat SMTP Gmail (TLS port 465), tanpa library
+function smtpSend({ host, port, user, pass, from, to, subject, html }) {
+  return new Promise((resolve, reject) => {
+    const body = Buffer.from(html).toString('base64').replace(/.{76}/g, '$&\r\n');
+    const msg = ['From: "NovaMind" <' + from + '>', 'To: <' + to + '>', 'Subject: =?UTF-8?B?' + Buffer.from(subject).toString('base64') + '?=',
+      'Date: ' + new Date().toUTCString(), 'MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', body].join('\r\n');
+    const steps = [
+      ['EHLO novamind', 250], ['AUTH LOGIN', 334], [Buffer.from(user).toString('base64'), 334], [Buffer.from(pass).toString('base64'), 235],
+      ['MAIL FROM:<' + from + '>', 250], ['RCPT TO:<' + to + '>', 250], ['DATA', 354], [msg + '\r\n.', 250], ['QUIT', 221],
+    ];
+    let i = -1, buf = '', done = false;
+    const sock = tls.connect({ host, port, servername: host });
+    const fin = (err) => { if (done) return; done = true; clearTimeout(t); try { sock.destroy(); } catch {} err ? reject(err) : resolve(); };
+    const t = setTimeout(() => fin(new Error('SMTP timeout')), 15000);
+    sock.setEncoding('utf8');
+    sock.on('error', (e) => fin(new Error('SMTP: ' + e.message)));
+    sock.on('close', () => fin(i >= steps.length - 1 ? null : new Error('SMTP terputus')));
+    sock.on('data', (d) => {
+      buf += d;
+      let k;
+      while ((k = buf.indexOf('\r\n')) >= 0) {
+        const line = buf.slice(0, k); buf = buf.slice(k + 2);
+        if (!/^\d{3} /.test(line)) continue; // baris lanjutan (250-...)
+        const code = +line.slice(0, 3), want = i < 0 ? 220 : steps[i][1];
+        if (code !== want) return fin(new Error('SMTP ' + line.slice(0, 90)));
+        i++;
+        if (steps[i][0] === 'QUIT') { sock.write('QUIT\r\n'); return fin(null); }
+        sock.write(steps[i][0] + '\r\n');
+      }
+    });
+  });
+}
+
 async function sendMail(to, name, code) {
   const html = '<div style="font-family:Arial,sans-serif;max-width:420px;margin:auto;padding:24px;border:1px solid #e5e5ef;border-radius:14px">'
     + '<h2 style="margin:0 0 8px">NovaMind AI</h2>'
     + '<p>Halo ' + esc(name) + ', ini kode verifikasimu:</p>'
     + '<p style="font-size:34px;letter-spacing:8px;font-weight:700;margin:14px 0">' + code + '</p>'
     + '<p style="color:#666;font-size:13px">Kode berlaku 10 menit. Jangan bagikan kode ini ke siapa pun. Abaikan email ini jika kamu tidak mendaftar.</p></div>';
+  const subject = 'Kode verifikasi NovaMind: ' + code;
+  if (GUSER && GPASS) {
+    await smtpSend({ host: process.env.SMTP_HOST || 'smtp.gmail.com', port: Number(process.env.SMTP_PORT) || 465, user: GUSER, pass: GPASS, from: GUSER, to, subject, html });
+    return;
+  }
   const r = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': BREVO, 'Content-Type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ sender: { name: 'NovaMind', email: FROM }, to: [{ email: to, name }], subject: 'Kode verifikasi NovaMind: ' + code, htmlContent: html }),
+    body: JSON.stringify({ sender: { name: 'NovaMind', email: FROM }, to: [{ email: to, name }], subject, htmlContent: html }),
   });
   if (!r.ok) { let t = ''; try { t = await r.text(); } catch {} throw new Error('Gagal kirim email (' + r.status + '): ' + t.slice(0, 100)); }
 }
@@ -87,7 +132,7 @@ export const POST = async (req) => {
 
     // langkah 1: validasi data, kirim kode ke email (akun belum dibuat)
     if (a === 'register') {
-      if (!BREVO || !FROM) return out(500, { error: 'Layanan email belum dikonfigurasi (BREVO_API_KEY / MAIL_FROM belum diisi di Vercel).' });
+      if (!MAIL_OK) return out(500, { error: MAIL_ERR });
       const name = String(b.name || '').trim().slice(0, 60), email = String(b.email || '').trim().toLowerCase(), pass = String(b.pass || '');
       if (name.length < 2) return out(400, { error: 'Nama minimal 2 karakter' });
       if (!emailOk(email)) return out(400, { error: 'Format email tidak valid' });
@@ -121,7 +166,7 @@ export const POST = async (req) => {
 
     // kirim ulang kode (dengan cooldown)
     if (a === 'resend') {
-      if (!BREVO || !FROM) return out(500, { error: 'Layanan email belum dikonfigurasi (BREVO_API_KEY / MAIL_FROM belum diisi di Vercel).' });
+      if (!MAIL_OK) return out(500, { error: MAIL_ERR });
       const email = String(b.email || '').trim().toLowerCase();
       if (!emailOk(email)) return out(400, { error: 'Format email tidak valid' });
       const raw = await rd('GET', 'pv:' + email);
