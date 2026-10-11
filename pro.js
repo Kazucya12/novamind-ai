@@ -73,7 +73,7 @@ function render(){
  var p=Q.plans||{};
  $('pfp').textContent=p.free+' pesan / hari';$('ppp').textContent=p.pro+' pesan / hari · '+p.price+' / '+p.days+' hari';
  $('pst').textContent=pro?'Pro aktif sampai '+tgl(Q.proUntil)+'. Beli lagi untuk memperpanjang.':'Kamu memakai paket Gratis ('+Q.used+'/'+Q.limit+' pesan terpakai hari ini).';
- $('pbuy').style.display=p.link?'':'none';$('pbuy').textContent=(pro?'Perpanjang Pro':'Beli Pro')+' · '+p.price;
+ $('pbuy').textContent=(pro?'Perpanjang Pro':'Beli Pro')+' · '+p.price;
 }
 function refresh(){return api({a:'quota'}).then(function(r){if(r.ok&&r.j.quota){Q=r.j.quota;render()}})}
 function msg(t,c){var m=$('pmsg');m.textContent=t||'';m.className=c||''}
@@ -83,7 +83,7 @@ card.onclick=qn.onclick=function(e){if(e.target.dataset&&e.target.dataset.up)ope
 $('pbk').onclick=closePro;
 ov.onclick=function(e){if(e.target===ov)closePro()};
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&ov.classList.contains('on'))closePro()});
-$('pbuy').onclick=function(){var l=Q&&Q.plans&&Q.plans.link;if(l&&/^https?:\/\//i.test(l))window.open(l,'_blank','noopener');else msg('Link pembayaran belum diatur.','er')};
+$('pbuy').onclick=function(){var l=Q&&Q.plans&&Q.plans.link;if(l&&/^https?:\/\//i.test(l))window.open(l,'_blank','noopener');else msg('Pembelian belum dibuka. Hubungi admin untuk membeli Pro.','er')};
 $('pact').onclick=function(){
  var c=$('pcode').value.trim();if(!c)return msg('Masukkan kode aktivasi','er');
  $('pact').disabled=true;msg('Memeriksa…');
