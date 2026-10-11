@@ -56,7 +56,8 @@ var CSS='#kzg{position:fixed;inset:0;z-index:99999;background:var(--bg,#0d0f1f);
 +'.kzu{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--bd,#2a2e5c)}'
 +'.kza{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--ac,#f2b84b),var(--ac2,#8f7cff));display:grid;place-items:center;font-weight:700;color:#14152b;flex-shrink:0}'
 +'.kzn{flex:1;min-width:0;line-height:1.3}.kzn b,.kzn small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kzn small{color:var(--mu,#9296bd);font-size:11px}'
-+'.kzu button{padding:6px 10px;font-size:12px;border-radius:10px;border:1px solid var(--bd,#2a2e5c);background:var(--gl2,#ffffff10);color:inherit;cursor:pointer;font-family:inherit}';
++'.kzu button{padding:6px 10px;font-size:12px;border-radius:10px;border:1px solid var(--bd,#2a2e5c);background:var(--gl2,#ffffff10);color:inherit;cursor:pointer;font-family:inherit}'
++'.kzlnk{background:none!important;border:0!important;color:var(--ac2,#8f7cff)!important;cursor:pointer;font:inherit;font-size:12px!important;padding:4px 0!important}.kzlnk:disabled{opacity:.5;cursor:default}';
 
 var GATE='<div class="kzc"><div class="kzl">✦</div><h1 id="kzh1">Masuk ke NovaMind</h1><p class="kzs" id="kzsub">Chat dan pengaturanmu tersimpan per akun</p>'
 +'<div class="kzt"><button id="kzTL" class="on">Masuk</button><button id="kzTR">Daftar</button></div>'
@@ -69,6 +70,7 @@ var GATE='<div class="kzc"><div class="kzl">✦</div><h1 id="kzh1">Masuk ke Nova
 +'<div class="kzb"><i id="kzsb"></i></div><div class="kzh" id="kzsh"></div>'
 +'<label>Ulangi kata sandi</label><div class="kzf"><input type="password" id="kzrC" placeholder="Ketik ulang" autocomplete="new-password"><button type="button" class="ey" data-t="kzrC">👁️</button></div>'
 +'<div class="kzk"><label><input type="checkbox" id="kzrA"> Saya setuju dengan syarat &amp; ketentuan</label></div><div class="kze" id="kzeR"></div><button class="kzp" id="kzbR">Buat Akun</button></form>'
++'<form id="kzFV" style="display:none" onsubmit="return false" novalidate><p class="kzs" id="kzvm"></p><label>Kode verifikasi (6 digit)</label><div class="kzf"><input type="text" id="kzvC" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code"></div><div class="kze" id="kzeV"></div><button class="kzp" id="kzbV">Verifikasi &amp; Buat Akun</button><div class="kzk" style="justify-content:space-between"><button type="button" id="kzRs" class="kzlnk">Kirim ulang kode</button><button type="button" id="kzBk" class="kzlnk">Ganti email</button></div></form>'
 +'</div>';
 
 function $(id){return document.getElementById(id)}
@@ -77,8 +79,17 @@ function tab(r){
  $('kzFL').style.display=r?'none':'';$('kzFR').style.display=r?'':'none';
  $('kzh1').textContent=r?'Buat akun NovaMind':'Masuk ke NovaMind';
  $('kzsub').textContent=r?'Daftar gratis dalam hitungan detik':'Chat dan pengaturanmu tersimpan per akun';
- $('kzeL').textContent=$('kzeR').textContent=''}
+ $('kzFV').style.display='none';$('kzeL').textContent=$('kzeR').textContent=''}
 
+var pendEmail='',cdT=0;
+function startCd(n){clearInterval(cdT);var b=$('kzRs'),c=n;b.disabled=true;b.textContent='Kirim ulang ('+c+')';
+ cdT=setInterval(function(){c--;if(c<=0){clearInterval(cdT);b.disabled=false;b.textContent='Kirim ulang kode'}else b.textContent='Kirim ulang ('+c+')'},1000)}
+function showVerify(email){
+ pendEmail=email;$('kzFL').style.display='none';$('kzFR').style.display='none';$('kzFV').style.display='';
+ document.querySelector('.kzt').style.display='none';
+ $('kzh1').textContent='Verifikasi email';$('kzsub').textContent='';
+ $('kzvm').textContent='Kode 6 digit sudah dikirim ke '+email+'. Cek juga folder spam.';
+ $('kzvC').value='';$('kzeV').textContent='';startCd(60);$('kzvC').focus()}
 function buildGate(){
  var g=document.createElement('div');g.id='kzg';g.innerHTML=GATE;document.body.appendChild(g);
  $('kzTL').onclick=function(){tab(false)};$('kzTR').onclick=function(){tab(true)};
@@ -95,11 +106,23 @@ function buildGate(){
   if(p!==$('kzrC').value)return er.textContent='Konfirmasi kata sandi tidak cocok';
   if(!$('kzrA').checked)return er.textContent='Centang persetujuan terlebih dahulu';
   /* akun baru selalu mulai kosong: chat lama di browser TIDAK ikut diunggah */
-  var body={a:'register',name:n,email:e,pass:p};
-  $('kzbR').disabled=true;er.textContent='';
-  api(body).then(function(r){$('kzbR').disabled=false;
+  $('kzbR').disabled=true;er.textContent='Mengirim kode…';
+  api({a:'register',name:n,email:e,pass:p}).then(function(r){$('kzbR').disabled=false;
    if(!r.ok)return er.textContent=r.j.error||'Gagal mendaftar';
+   er.textContent='';showVerify(e)})};
+ $('kzbV').onclick=function(){
+  var c=$('kzvC').value.replace(/\D/g,''),er=$('kzeV');
+  if(c.length!==6)return er.textContent='Masukkan 6 digit kode';
+  $('kzbV').disabled=true;er.textContent='';
+  api({a:'verify',email:pendEmail,code:c}).then(function(r){$('kzbV').disabled=false;
+   if(!r.ok)return er.textContent=r.j.error||'Kode salah';
    startSession(r.j,true)})};
+ $('kzRs').onclick=function(){
+  var er=$('kzeV');er.textContent='';
+  api({a:'resend',email:pendEmail}).then(function(r){
+   if(!r.ok){if(r.j.wait)startCd(r.j.wait);return er.textContent=r.j.error||'Gagal kirim ulang'}
+   er.textContent='Kode baru sudah dikirim';startCd(60)})};
+ $('kzBk').onclick=function(){clearInterval(cdT);document.querySelector('.kzt').style.display='';tab(true)};
  $('kzbL').onclick=function(){
   var e=$('kzlE').value.trim().toLowerCase(),p=$('kzlP').value,er=$('kzeL');
   if(!emailOk(e)||!p)return er.textContent='Isi email dan kata sandi dengan benar';
@@ -107,7 +130,7 @@ function buildGate(){
   api({a:'login',email:e,pass:p}).then(function(r){$('kzbL').disabled=false;
    if(!r.ok)return er.textContent=r.j.error||'Gagal masuk';
    startSession(r.j,$('kzlR').checked)})};
- [['kzlE','kzbL'],['kzlP','kzbL'],['kzrC','kzbR']].forEach(function(x){$(x[0]).addEventListener('keydown',function(ev){if(ev.key==='Enter')$(x[1]).click()})});
+ [['kzlE','kzbL'],['kzlP','kzbL'],['kzrC','kzbR'],['kzvC','kzbV']].forEach(function(x){$(x[0]).addEventListener('keydown',function(ev){if(ev.key==='Enter')$(x[1]).click()})});
 }
 
 function buildBar(){
