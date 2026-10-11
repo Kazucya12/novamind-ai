@@ -443,5 +443,6 @@ applySet();render();
 (async()=>{try{sample=window.claude?await claude.use('sample'):null}catch(e){}
  if(!sample&&S.set.prov==='claude'){S.set.prov='dproxy';save();applySet();render()}})();
 </script>
+<script src="pro.js"></script>
 </body>
 </html>
