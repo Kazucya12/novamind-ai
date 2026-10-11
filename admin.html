@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>NovaMind Admin</title>
+<style>
+:root{--bg:#0d0f1f;--card:#16193a;--bd:#2a2e5c;--tx:#eceefb;--mu:#9296bd;--ac:#f2b84b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.6 system-ui,sans-serif;padding:18px;display:flex;justify-content:center}
+.w{width:100%;max-width:460px}
+h1{font-size:20px;margin:6px 0 2px}.s{color:var(--mu);font-size:13px;margin:0 0 14px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:16px;margin-bottom:14px}
+.c h2{font-size:15px;margin:0 0 6px}
+label{display:block;font-size:12px;color:var(--mu);margin:10px 0 4px}
+input,textarea{width:100%;padding:10px 12px;border-radius:11px;border:1.5px solid var(--bd);background:#ffffff10;color:inherit;font:inherit;outline:0}
+input:focus,textarea:focus{border-color:#8f7cff}
+.r{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{width:100%;margin-top:12px;padding:11px;border:0;border-radius:11px;font:600 15px inherit;font-family:inherit;color:#1a1405;background:linear-gradient(135deg,var(--ac),#ea8a3a);cursor:pointer}
+button.g{background:#ffffff14;color:var(--tx);border:1px solid var(--bd);margin-top:8px}
+button:disabled{opacity:.6}
+.m{min-height:20px;font-size:13px;margin-top:10px;text-align:center}.m.er{color:#ff7a7a}.m.ok{color:#5fe0a0}
+textarea{min-height:110px;font-family:ui-monospace,monospace;font-size:14px}
+</style>
+</head>
+<body>
+<div class="w">
+ <h1>NovaMind Admin</h1>
+ <p class="s">Halaman ini hanya untuk pemilik. Jangan dibagikan.</p>
+
+ <div class="c">
+  <label>Kunci admin (ADMIN_KEY di Vercel)</label>
+  <input type="password" id="k" autocomplete="off" placeholder="Kunci admin">
+ </div>
+
+ <div class="c">
+  <h2>1. Buat kode Pro</h2>
+  <div class="r">
+   <div><label>Jumlah kode</label><input type="number" id="cn" value="1" min="1" max="50"></div>
+   <div><label>Lama Pro (hari)</label><input type="number" id="cd" value="30" min="1" max="365"></div>
+  </div>
+  <button id="bc">Buat kode</button>
+  <textarea id="out" readonly placeholder="Kode muncul di sini" style="margin-top:12px"></textarea>
+  <button class="g" id="cp">Salin semua kode</button>
+  <div class="m" id="m1"></div>
+ </div>
+
+ <div class="c">
+  <h2>2. Beri Pro langsung ke akun</h2>
+  <label>Email akun</label><input type="email" id="ge" placeholder="nama@email.com">
+  <label>Lama Pro (hari)</label><input type="number" id="gd" value="30" min="1" max="365">
+  <button id="bg">Beri Pro</button>
+  <div class="m" id="m2"></div>
+ </div>
+</div>
+<script>
+function $(i){return document.getElementById(i)}
+function call(b){return fetch('/api/account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json().catch(function(){return{}}).then(function(j){return{ok:r.ok,j:j}})},function(){return{ok:false,j:{error:'Tidak bisa terhubung ke server'}}})}
+function say(id,t,ok){var m=$(id);m.textContent=t;m.className='m '+(ok?'ok':'er')}
+$('bc').onclick=function(){
+ var key=$('k').value;if(!key)return say('m1','Isi kunci admin dulu');
+ $('bc').disabled=true;say('m1','Membuat…',1);
+ call({a:'admin_codes',key:key,count:+$('cn').value,days:+$('cd').value}).then(function(r){$('bc').disabled=false;
+  if(!r.ok)return say('m1',r.j.error||'Gagal');
+  $('out').value=r.j.codes.join('\n');say('m1',r.j.codes.length+' kode dibuat (masing-masing '+r.j.days+' hari). Tiap kode hanya bisa dipakai sekali.',1)})};
+$('cp').onclick=function(){var t=$('out').value;if(!t)return;
+ (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){say('m1','Tersalin',1)},function(){$('out').select();say('m1','Pilih teks lalu salin manual',1)})};
+$('bg').onclick=function(){
+ var key=$('k').value;if(!key)return say('m2','Isi kunci admin dulu');
+ $('bg').disabled=true;say('m2','Memproses…',1);
+ call({a:'admin_grant',key:key,email:$('ge').value,days:+$('gd').value}).then(function(r){$('bg').disabled=false;
+  if(!r.ok)return say('m2',r.j.error||'Gagal');
+  say('m2','Pro aktif untuk '+r.j.email+' sampai '+new Date(r.j.proUntil).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}),1)})};
+</script>
+</body>
+</html>
