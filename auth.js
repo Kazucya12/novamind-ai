@@ -94,12 +94,12 @@ function buildGate(){
   if(p.length<8)return er.textContent='Kata sandi minimal 8 karakter';
   if(p!==$('kzrC').value)return er.textContent='Konfirmasi kata sandi tidak cocok';
   if(!$('kzrA').checked)return er.textContent='Centang persetujuan terlebih dahulu';
-  var body={a:'register',name:n,email:e,pass:p},old=null;
-  if(!get('kz_legacy')){try{old=LS&&G.call(LS,DATA)}catch(x){}if(old){body.data=old;body.ts=Date.now()}}
+  /* akun baru selalu mulai kosong: chat lama di browser TIDAK ikut diunggah */
+  var body={a:'register',name:n,email:e,pass:p};
   $('kzbR').disabled=true;er.textContent='';
   api(body).then(function(r){$('kzbR').disabled=false;
    if(!r.ok)return er.textContent=r.j.error||'Gagal mendaftar';
-   set('kz_legacy','1');startSession(r.j,true)})};
+   startSession(r.j,true)})};
  $('kzbL').onclick=function(){
   var e=$('kzlE').value.trim().toLowerCase(),p=$('kzlP').value,er=$('kzeL');
   if(!emailOk(e)||!p)return er.textContent='Isi email dan kata sandi dengan benar';
