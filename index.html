@@ -174,7 +174,6 @@ header .btn{padding:8px 11px}
 .m.u .bub{max-width:88%}
 .empty{padding-top:4vh}
 }
-#uf{display:none!important}
 #kf{display:none!important}
 body.need-code #kf{display:block!important}
 </style>
@@ -386,12 +385,12 @@ async function call(msgs,sys,on,signal){
  if(!k&&!p.nk&&!p.custom)throw new Error('API key '+p.n+' belum diisi. Buka pengaturan lalu tempel key.');
  if(!m)throw new Error('Pilih atau ketik nama model dulu di pengaturan.');
  let url,hd={'Content-Type':'application/json'},body;
- if(p.t==='an'){url='[https://api.anthropic.com/v1/messages';Object.assign(hd](https://api.anthropic.com/v1/messages';Object.assign(hd),{'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'});body={model:m,max_tokens:4096,system:sys,messages:msgs.map(x=>({role:x.role,content:anC(x)})),stream:true}}
- else if(p.t==='gm'){url='[https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':streamGenerateContent?alt=sse&key='+encodeURIComponent(k);body=](https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':streamGenerateContent?alt=sse&key='+encodeURIComponent(k);body=){systemInstruction:{parts:[{text:sys}]},contents:msgs.map(x=>({role:x.role==='user'?'user':'model',parts:gmP(x)}))}}
+ if(p.t==='an'){url='https://api.anthropic.com/v1/messages';Object.assign(hd,{'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'});body={model:m,max_tokens:4096,system:sys,messages:msgs.map(x=>({role:x.role,content:anC(x)})),stream:true}}
+ else if(p.t==='gm'){url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':streamGenerateContent?alt=sse&key='+encodeURIComponent(k);body={systemInstruction:{parts:[{text:sys}]},contents:msgs.map(x=>({role:x.role==='user'?'user':'model',parts:gmP(x)}))}}
  else{const base=(p.custom?(s.urls[s.prov]||''):p.u).replace(/\/$/,'');if(!base)throw new Error('Isi Base URL dulu di pengaturan.');url=base+'/chat/completions';if(k)hd.Authorization='Bearer '+k;body={model:m,stream:true,messages:[{role:'system',content:sys},...msgs.map(x=>({role:x.role,content:oaC(x)}))]}}
  let res;
  try{res=await fetch(url,{method:'POST',headers:hd,body:JSON.stringify(body),signal})}
- catch(e){if(e.name==='AbortError')throw e;throw new Error('Koneksi terputus ke '+url.split('?')[0])}
+ catch(e){if(e.name==='AbortError')throw e;throw new Error('Koneksi terputus ke '+url.split('?')[0]+(url.charAt(0)==='/'?'. Alamat relatif hanya jalan bila halaman dibuka dari server yang punya endpoint itu. Isi Base URL lengkap di Pengaturan, mis. https://domainmu.com/api/v1':'. Periksa alamat proxy dan koneksi internet.'))}
  if(res.status===401){document.body.classList.add('need-code');setTimeout(openSet,300)}
  if(!res.ok){let t='';try{t=await res.text()}catch(e){}let j='';try{const o=JSON.parse(t);j=(o.error&&(o.error.message||o.error))||o.message||''}catch(e){}
   throw new Error('Error '+res.status+': '+String(j||t).slice(0,200))}
@@ -601,7 +600,6 @@ window.addEventListener('message',e=>{
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('prv').classList.contains('on'))closePreview()});$('vl').onchange=()=>{S.set.vl=$('vl').value;save()};$('per').innerHTML=P.map(p=>'<option value="'+p.id+'">'+p.i+' '+p.n+'</option>').join('');
 applySet();render();
-})();
 </script>
 </body>
 </html>
