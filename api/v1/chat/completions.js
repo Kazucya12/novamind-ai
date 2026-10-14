@@ -3,7 +3,7 @@ import { redis, configured, body, verifyToken, bearer, getQuota, dayKey, PRO_MOD
 const err = (res, code, message) => res.status(code).json({ error: { message } });
 const TEST = 'Balas hanya dengan kata: OK';
 
-export default async function handler(req, res) {
+async function run(req, res) {
   if (req.method !== 'POST') return err(res, 405, 'Method not allowed');
   if (!configured() || !process.env.UPSTREAM_URL) return err(res, 500, 'Server belum dikonfigurasi (UPSTREAM_URL).');
   const email = verifyToken(bearer(req));
@@ -47,4 +47,13 @@ export default async function handler(req, res) {
   if (!up.body) return res.end(await up.text());
   try { for await (const chunk of up.body) res.write(chunk); } catch {}
   res.end();
+}
+
+export default async function handler(req, res) {
+  try { await run(req, res); }
+  catch (e) {
+    console.error(e);
+    if (!res.headersSent) err(res, 500, 'Server error: ' + String((e && e.message) || e).slice(0, 160));
+    else { try { res.end(); } catch {} }
+  }
 }
