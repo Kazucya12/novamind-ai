@@ -1,4 +1,4 @@
-/* NovaMind Pro + kuota harian. Dimuat otomatis oleh auth.js setelah login (tidak perlu mengubah index.html). */
+/* NovaMind Pro + kuota harian (persen). Dimuat otomatis oleh auth.js setelah login (tidak perlu mengubah index.html). */
 (function(){
 'use strict';
 function tk(){try{return sessionStorage.getItem('kz_tok')||localStorage.getItem('kz_tok')}catch(e){return null}}
@@ -6,7 +6,7 @@ if(window.__novaPro||!tk()||!document.getElementById('side'))return;
 window.__novaPro=1;
 
 var PRO_MODELS={'deepseek-v4-pro-0813':1,'gpt-5.6-luna':1}; /* model khusus Pro */
-var Q=null;
+var Q=null,warned=false;
 /* batas per paket: mem = jumlah pesan terakhir yang diingat AI, max = batas token jawaban */
 var LIM={free:{mem:8,max:2500,words:500},pro:{mem:30,max:5000}};
 function lim(){return LIM[Q&&Q.plan==='pro'?'pro':'free']}
@@ -16,21 +16,24 @@ function api(body){
   .then(function(r){return r.json().catch(function(){return{}}).then(function(j){return{ok:r.ok,status:r.status,j:j}})},
         function(){return{ok:false,status:0,j:{}}})}
 function tgl(ts){try{return new Date(ts).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}catch(e){return ''}}
+function pctOf(q){return q&&q.limit?Math.max(0,Math.min(100,Math.round(q.remaining/q.limit*100))):0}
 
 /* ---------- gaya ---------- */
 var st=document.createElement('style');
 st.textContent=
 '.qc{margin:0 14px 12px;padding:11px 12px;border:1px solid var(--bd);border-radius:14px;background:var(--gl2);font-size:12.5px}'
-+'.qh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}'
++'.qh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}'
 +'.qtag{padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid var(--bd);color:var(--mu)}'
 +'.qtag.pro{background:linear-gradient(135deg,var(--ac),#ea8a3a);color:#1a1405;border:0}'
++'.qp{display:flex;align-items:baseline;gap:6px;margin-bottom:6px}.qp b{font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.qp span{color:var(--mu);font-size:12px}'
++'.qp.low b{color:#ef4444}'
 +'.qbar{height:6px;border-radius:6px;background:var(--bd);overflow:hidden}'
 +'.qbar i{display:block;height:100%;background:linear-gradient(90deg,var(--ac3),var(--ac2));transition:width .4s}'
 +'.qbar.low i{background:linear-gradient(90deg,#f59e0b,#ef4444)}'
 +'.qm{color:var(--mu);margin-top:7px;font-size:11.5px}'
 +'.qup{width:100%;margin-top:9px;padding:8px;border-radius:11px;font-weight:600;background:linear-gradient(135deg,var(--ac),#ea8a3a);color:#1a1405;border:0;cursor:pointer}'
 +'#qnote{max-width:780px;margin:4px auto 0;text-align:center;font-size:12px;color:var(--mu)}'
-+'#qnote b{color:var(--tx)}#qnote button{color:var(--ac);text-decoration:underline;background:none;border:0;cursor:pointer;font:inherit;padding:0 2px}'
++'#qnote b{color:var(--tx)}#qnote .lo{color:#ef4444}#qnote button{color:var(--ac);text-decoration:underline;background:none;border:0;cursor:pointer;font:inherit;padding:0 2px}'
 +'#pro{display:none;position:fixed;inset:0;z-index:40;background:#000a;backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px}'
 +'#pro.on{display:flex}'
 +'.pm{background:var(--bg);border:1px solid var(--bd);border-radius:22px;padding:20px;width:100%;max-width:440px;max-height:92%;overflow-y:auto;color:var(--tx)}'
@@ -68,18 +71,19 @@ document.body.appendChild(ov);
 /* ---------- tampilan ---------- */
 function render(){
  if(!Q)return;
- var pro=Q.plan==='pro',pct=Math.max(0,Math.min(100,Math.round(Q.remaining/Q.limit*100)));
+ var pro=Q.plan==='pro',pct=pctOf(Q),low=pct<=20;
  card.innerHTML='<div class="qh"><b>Kuota hari ini</b><span class="qtag'+(pro?' pro':'')+'">'+(pro?'⭐ PRO':'GRATIS')+'</span></div>'
-  +'<div class="qbar'+(pct<=20?' low':'')+'"><i style="width:'+pct+'%"></i></div>'
-  +'<div class="qm">Sisa <b>'+Q.remaining+'</b> dari '+Q.limit+' pesan · reset 00.00 WIB'+(pro?'<br>Pro aktif sampai '+tgl(Q.proUntil):'')+'</div>'
+  +'<div class="qp'+(low?' low':'')+'"><b>'+pct+'%</b><span>'+(Q.remaining<=0?'habis':'tersisa')+'</span></div>'
+  +'<div class="qbar'+(low?' low':'')+'"><i style="width:'+pct+'%"></i></div>'
+  +'<div class="qm">'+Q.remaining+' dari '+Q.limit+' pesan · reset 00.00 WIB'+(pro?'<br>Pro aktif sampai '+tgl(Q.proUntil):'')+'</div>'
   +(pro?'':'<button class="qup" data-up="1">Upgrade ke Pro</button>');
- qn.innerHTML='Sisa <b>'+Q.remaining+'/'+Q.limit+'</b> pesan hari ini'+(pro?' · ⭐ Pro':' · <button data-up="1">Upgrade Pro</button>');
+ qn.innerHTML='Kuota <b'+(low?' class="lo"':'')+'>'+pct+'%</b> · '+Q.remaining+'/'+Q.limit+' pesan hari ini'+(pro?' · ⭐ Pro':' · <button data-up="1">Upgrade Pro</button>');
  var p=Q.plans||{};
  $('pfp').textContent=p.free+' pesan / hari';$('ppp').textContent=p.pro+' pesan / hari · '+p.price+' / '+p.days+' hari';
- $('pst').textContent=pro?'Pro aktif sampai '+tgl(Q.proUntil)+'. Beli lagi untuk memperpanjang.':'Kamu memakai paket Gratis ('+Q.used+'/'+Q.limit+' pesan terpakai hari ini).';
+ $('pst').textContent=pro?'Pro aktif sampai '+tgl(Q.proUntil)+'. Beli lagi untuk memperpanjang.':'Kamu memakai paket Gratis ('+Q.used+'/'+Q.limit+' pesan terpakai hari ini, sisa '+pct+'%).';
  $('pbuy').textContent=(pro?'Perpanjang Pro':'Beli Pro')+' · '+p.price;
 }
-function refresh(){return api({a:'quota'}).then(function(r){if(r.ok&&r.j.quota){Q=r.j.quota;render()}})}
+function refresh(){return api({a:'quota'}).then(function(r){if(r.ok&&r.j.quota){Q=r.j.quota;if(pctOf(Q)>20)warned=false;render()}})}
 function msg(t,c){var m=$('pmsg');m.textContent=t||'';m.className=c||''}
 function openPro(){msg('');render();ov.classList.add('on');refresh()}
 function closePro(){ov.classList.remove('on')}
@@ -101,7 +105,7 @@ $('pact').onclick=function(){
  $('pact').disabled=true;msg('Memeriksa…');
  api({a:'redeem',code:c}).then(function(r){$('pact').disabled=false;
   if(!r.ok)return msg(r.j.error||'Gagal mengaktifkan','er');
-  Q=r.j.quota;render();$('pcode').value='';msg('Pro aktif! +'+r.j.days+' hari. Selamat menikmati ⭐','ok')})};
+  Q=r.j.quota;warned=false;render();$('pcode').value='';msg('Pro aktif! +'+r.j.days+' hari. Selamat menikmati ⭐','ok')})};
 $('pcode').addEventListener('keydown',function(e){if(e.key==='Enter')$('pact').click()});
 
 /* ---------- hitung setiap permintaan AI ---------- */
@@ -117,6 +121,8 @@ if(typeof _call==='function'){
    if(r.j&&r.j.quota){Q=r.j.quota;render()}
    if(r.status===429){setTimeout(openPro,250);throw new Error(r.j.error||'Kuota harian habis.')}
    if(r.status===401)throw new Error('Sesi berakhir. Muat ulang halaman lalu masuk lagi.');
+   /* peringatan saat kuota tinggal 20% atau kurang */
+   if(Q&&Q.plan!=='pro'&&!warned&&pctOf(Q)<=20&&typeof toast==='function'){warned=true;toast(Q.remaining>0?'Kuota tinggal '+pctOf(Q)+'%':'Kuota hari ini habis setelah pesan ini')}
   }
   return _call.call(this,test?msgs:shape(msgs),test?sys:sysFor(sys),on,signal);
  };
@@ -130,12 +136,14 @@ function shape(msgs){
 function sysFor(sys){
  if(Q&&Q.plan==='pro')return sys;
  return sys+' Jawab ringkas dan padat, maksimal sekitar '+LIM.free.words+' kata, agar jawaban tidak terpotong.'}
-/* batas token jawaban dikirim ke proxy (kalau proxy mendukung max_tokens) */
+/* kirim token login ke proxy (server memeriksa kuota & paket) + batas token jawaban */
 var _fetch=window.fetch;
 window.fetch=function(u,o){
  try{
-  if(Q&&o&&typeof o.body==='string'&&String(u).indexOf('/chat/completions')>-1){
-   var b=JSON.parse(o.body);b.max_tokens=lim().max;o=Object.assign({},o,{body:JSON.stringify(b)})}
+  if(o&&typeof o.body==='string'&&String(u).indexOf('/chat/completions')>-1){
+   var b=JSON.parse(o.body);if(Q)b.max_tokens=lim().max;
+   var h=Object.assign({},o.headers,{Authorization:'Bearer '+tk()});
+   o=Object.assign({},o,{body:JSON.stringify(b),headers:h})}
  }catch(e){}
  return _fetch.call(this,u,o)};
 
